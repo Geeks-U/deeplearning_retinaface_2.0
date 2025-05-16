@@ -64,9 +64,9 @@ class ShareHead(nn.Module):
             'ldm': ldm_outputs
             }
 
-from backbone import MobileNetV2
-from fpn import FPN
-from ssh import SSH
+from src.nets.backbone import MobileNetV2
+from src.nets.fpn import FPN
+from src.nets.ssh import SSH
 
 if __name__ == '__main__':
     mn = MobileNetV2()

@@ -2,10 +2,10 @@ import torch
 import torch.nn as nn
 import copy
 
-from backbone import MobileNetV2
-from fpn import FPN
-from ssh import SSH
-from head import ShareHead
+from src.nets.backbone import MobileNetV2
+from src.nets.fpn import FPN
+from src.nets.ssh import SSH
+from src.nets.head import ShareHead
 
 cfg_default = {}
 

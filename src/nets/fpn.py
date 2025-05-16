@@ -80,7 +80,7 @@ class FPN(nn.Module):
             'low': output_stage_low
         }
 
-from backbone import MobileNetV2
+from src.nets.backbone import MobileNetV2
 
 if __name__ == '__main__':
     mn = MobileNetV2()

@@ -63,8 +63,8 @@ class SSH(nn.Module):
             'low': output_stage_low
         }
 
-from backbone import MobileNetV2
-from fpn import FPN
+from src.nets.backbone import MobileNetV2
+from src.nets.fpn import FPN
 
 if __name__ == '__main__':
     mn = MobileNetV2()
