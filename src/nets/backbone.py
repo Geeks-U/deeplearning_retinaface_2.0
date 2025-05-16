@@ -6,7 +6,7 @@ import sys
 
 # 默认配置
 cfg_default = {
-    'pretrained': False,               # 是否使用预训练权重
+    'pretrained': True,               # 是否使用预训练权重
     'frozen': False,                  # 是否冻结特征提取层
     'out_layers': [4, 7, 14],         # 指定哪些层的输出作为特征输出
     'out_step': None,                 # 每个输出特征的步长（stride）
@@ -77,18 +77,12 @@ class MobileNetV2(nn.Module):
         out_names = ['high', 'mid', 'low']
         name_map = dict(zip(out_indices, out_names))
         max_layer = max(out_indices)
-
         for idx, layer in enumerate(self.model.features):
             x = layer(x)
             if idx in name_map:
                 outputs[name_map[idx]] = x
             if idx >= max_layer:
                 break
-        if torch.isnan(outputs['high']).any():
-            print("bbhigh数据中存在 NaN！")
-            sys.exit(0)
-        if torch.isinf(outputs['high']).any():
-            print("bbhigh数据中存在 Inf！")
 
         # 确保输出顺序为 high, mid, low
         return {name: outputs[name] for name in ['high', 'mid', 'low']}

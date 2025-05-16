@@ -35,7 +35,9 @@ class CustomDataset(Dataset):
                 box = [parts[0], parts[1], parts[0] + parts[2], parts[1] + parts[3]]
                 landm = []
                 # ldm=-1表示无人脸关键点
-                # score=-1表示有人脸但无关键点(ldm置0)，0表示背景，1表示有人脸且有关键点
+                # score=-1表示有人脸但无关键点(ldm置0)
+                # score=0表示背景
+                # score=1表示有人脸且有关键点
                 if parts[4] > 0:
                     for i in range(5):
                         landm += parts[4 + (i * 3):6 + (i * 3)]
@@ -74,26 +76,17 @@ class CustomDataset(Dataset):
         input_h, input_w = input_shape
         scale_x = input_w / img_w
         scale_y = input_h / img_h
-        # print('raw_img_shape: ', (img_w, img_h))
-        # print('raw_img_label: ', label)
-        # draw_image_with_label_px(image, label)
-        # 图像缩放
+
         image = image.resize((input_w, input_h), Image.BICUBIC)
-        new_image = np.array(image, dtype=np.float32)
-        # 中心化 使得分布的均值为0 RGB-E(RGB)
-        new_image -= np.array((123, 117, 104),np.float32)
-        # 通道变换 H, W, C => C, H, W
+        new_image = np.array(image, dtype=np.uint8)
+        new_image = np.array(new_image, dtype=np.float32) - np.array((123, 117, 104), np.float32)
         new_image = np.transpose(new_image, (2, 0, 1))
-        # 化为percent
+
         label[:, 0:14:2] *= scale_x / input_w
         label[:, 1:15:2] *= scale_y / input_h
-        # x_lt, y_lt, x_rb, y_rb => x_c, y_c, w, h
-        label[:, :2] = (label[:, :2] + label[:,2:4]) / 2
-        label[:,2:4] = (label[:,2:4] - label[:, :2]) * 2
 
-        # draw_image_with_label_percent(image, label)
-        # print('new_img_shape: ', (input_w, input_h))
-        # print('new_img_label: ', label)
+        # 对坐标clip到0~1范围
+        label[:, 0:14] = np.clip(label[:, 0:14], 0, 1)
 
         return new_image, label
 
