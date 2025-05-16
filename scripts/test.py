@@ -50,8 +50,8 @@ cfg_test = {
     },
     # checkpoints/1746204358.3167648_best.pth
     'cfg_data': {
-        'model_path': r'D:\Code\Python\deeplearning\retinaface\checkpoints/1746261580.7198381_best.pth',
-        'img_path': r'D:\Code\Python\deeplearning\retinaface\src\images\6_Funeral_Funeral_6_759.jpg',
+        'model_path': r'D:\Code\DL\Pytorch\retinaface\weights\model_last_20250516_165547.pth',
+        'img_path': r'D:\Code\DL\Pytorch\retinaface\src\images\0_Parade_marchingband_1_122.jpg',
         'image_size': [1280, 1280],
     },
     'cfg_hyperparameter': {

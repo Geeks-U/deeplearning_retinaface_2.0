@@ -85,7 +85,7 @@ class CustomDataset(Dataset):
         label[:, 0:14:2] *= scale_x / input_w
         label[:, 1:15:2] *= scale_y / input_h
 
-        # 对坐标clip到0~1范围
+        # 对坐标clip到0~1范围 防止loss爆炸
         label[:, 0:14] = np.clip(label[:, 0:14], 0, 1)
 
         return new_image, label

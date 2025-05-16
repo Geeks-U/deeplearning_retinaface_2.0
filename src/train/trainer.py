@@ -31,6 +31,7 @@ if __name__ == '__main__':
     batch_size = 16
     learning_rate = 1e-2
 
+    # corner坐标，单位percent，范围0-1
     train_dataset = CustomDataset()
     train_loader = DataLoader(
         train_dataset, batch_size=batch_size, shuffle=True,
@@ -41,6 +42,7 @@ if __name__ == '__main__':
 
     weights_save_dir = Path(r'D:\Code\DL\Pytorch\retinaface\weights')
     weights_save_dir.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
 
     anchors = CustomAnchors(cfg_anchor=cfg_anchor).get_center_anchors().to(device)
     print("锚框形状: ", anchors.size())
@@ -97,7 +99,6 @@ if __name__ == '__main__':
               f"(Loc: {avg_loc:.4f}, Conf: {avg_conf:.4f}, Landm: {avg_landm:.4f})")
 
         # 保存模型
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         last_path = weights_save_dir / f'model_last_{timestamp}.pth'
         save_model(model, last_path)
 

@@ -5,6 +5,8 @@ import numpy as np
 import torch
 import torch.nn as nn
 
+import torch.nn.functional as F
+
 from src.nets.retinaface import Retinaface as retin
 from src.utils.anchor import CustomAnchors
 from src.utils.utils import letterbox_image, preprocess_input
@@ -99,7 +101,8 @@ class Retinaface(object):
             #---------------------------------------------------------#
             #   传入网络进行预测
             #---------------------------------------------------------#
-            loc, conf, landms = self.net(image)
+            out = self.net(image)
+            loc, conf, landms = out['bbox'], F.softmax(out['cls'], dim=-1), out['ldm']
 
             #-----------------------------------------------------------#
             #   对预测框进行解码
