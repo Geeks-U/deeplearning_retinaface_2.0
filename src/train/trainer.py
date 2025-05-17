@@ -62,6 +62,34 @@ class Trainer:
         torch.save(self.model.state_dict(), path)
         print(f"Saved model to {path}")
 
+    def validate(self):
+        self.model.eval()
+        val_loss, val_loc, val_conf, val_landm = 0, 0, 0, 0
+        with torch.no_grad():
+            for images, targets in self.val_loader:
+                images = torch.from_numpy(images).float().to(self.device)
+                targets = [torch.from_numpy(ann).float().to(self.device) for ann in targets]
+
+                out = self.model(images)
+                loss_l, loss_c, loss_landm = self.criterion(
+                    [out['bbox'], out['cls'], out['ldm']], self.anchors, targets)
+                loss = 2 * loss_l + loss_c + loss_landm
+
+                val_loss += loss.item()
+                val_loc += loss_l.item()
+                val_conf += loss_c.item()
+                val_landm += loss_landm.item()
+
+        avg_val_loss = val_loss / len(self.val_loader)
+        avg_val_loc = val_loc / len(self.val_loader)
+        avg_val_conf = val_conf / len(self.val_loader)
+        avg_val_landm = val_landm / len(self.val_loader)
+
+        print(f"[Validation] Avg Loss: {avg_val_loss:.4f} "
+              f"(Loc: {avg_val_loc:.4f}, Conf: {avg_val_conf:.4f}, Landm: {avg_val_landm:.4f})")
+
+        return avg_val_loss
+
     def train(self):
         for epoch in range(self.num_epochs):
             self.model.train()
@@ -102,35 +130,28 @@ class Trainer:
             avg_conf = total_conf / len(self.train_loader)
             avg_landm = total_landm / len(self.train_loader)
 
-            print(f"[Epoch {epoch + 1}] Avg Loss: {avg_loss:.4f} "
+            print(f"[Epoch {epoch + 1}] Train - Avg Loss: {avg_loss:.4f} "
                   f"(Loc: {avg_loc:.4f}, Conf: {avg_conf:.4f}, Landm: {avg_landm:.4f})")
+
+            avg_val_loss = self.validate()
 
             last_path = self.weights_save_dir / f'model_last_{self.timestamp}.pth'
             self.save_model(last_path)
 
-            if avg_loss < self.best_loss:
+            if avg_val_loss < self.best_loss:
                 print('-----------------------------------------------------')
-                self.best_loss = avg_loss
+                self.best_loss = avg_val_loss
                 best_path = self.weights_save_dir / f'model_best_{self.timestamp}.pth'
                 self.save_model(best_path)
 
 
 if __name__ == '__main__':
-    config = {
+    cfg_trainer = {
         'num_epochs': 10,
         'batch_size': 32,
         'learning_rate': 1e-2,
         'cuda': True,
-        'weights_save_dir': r'D:\Code\DL\Pytorch\retinaface\weights',
-        'weights_save_filename_suffix': datetime.now().strftime('%Y%m%d_%H%M%S')
     }
 
-    datamodule_cfg = {
-        'batch_size': config['batch_size'],
-        'num_workers': 4,
-        'pin_memory': True,
-        'val_split': 0.1
-    }
-
-    trainer = Trainer(cfg_trainer=config, datamodule_cfg=datamodule_cfg)
+    trainer = Trainer(cfg_trainer=cfg_trainer)
     trainer.train()

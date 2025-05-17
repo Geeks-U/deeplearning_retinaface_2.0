@@ -2,7 +2,7 @@ from src.train.trainer import Trainer
 
 if __name__ == '__main__':
     cfg_trainer = {
-        'num_epochs': 10,
+        'num_epochs': 30,
         'batch_size': 32,
     }
 
