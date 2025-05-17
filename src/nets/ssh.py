@@ -2,6 +2,16 @@ import torch
 import torch.nn as nn
 import copy
 
+# 注册表
+SSH_REGISTRY = {}
+# 装饰器
+def register_ssh(name: str):
+    def decorator(cls):
+        SSH_REGISTRY[name] = cls
+        return cls
+    return decorator
+
+
 class SSHBasic(nn.Module):
     def __init__(self, in_channels, out_channels):
         super().__init__()
@@ -38,15 +48,17 @@ class SSHBasic(nn.Module):
 
         return outputs
 
-cfg_default = {
+cfg_ssh_default = {
     'in_channels': [64, 64, 64],
+    'out_names': ['high', 'mid', 'low'],
     'out_channels': [256, 256, 256],
 }
 
+@register_ssh('ssh')
 class SSH(nn.Module):
     def __init__(self, cfg_ssh=None):
         super().__init__()
-        self.cfg = copy.deepcopy(cfg_default)
+        self.cfg = copy.deepcopy(cfg_ssh_default)
         if cfg_ssh is not None:
             self.cfg.update(cfg_ssh)
         self.stage_high = SSHBasic(in_channels=self.cfg['in_channels'][0], out_channels=self.cfg['out_channels'][0])
@@ -58,19 +70,26 @@ class SSH(nn.Module):
         output_stage_mid = self.stage_mid(x['mid'])
         output_stage_high = self.stage_high(x['high'])
         return {
-            'high': output_stage_high,
-            'mid': output_stage_mid,
-            'low': output_stage_low
+            self.cfg['out_names'][0]: output_stage_high,
+            self.cfg['out_names'][1]: output_stage_mid,
+            self.cfg['out_names'][2]: output_stage_low
         }
 
-from src.nets.backbone import MobileNetV2
-from src.nets.fpn import FPN
+# 工厂函数
+def build_ssh(model_name: str, cfg_ssh=None) -> nn.Module:
+    if model_name not in SSH_REGISTRY:
+        raise ValueError(f"Unknown model name: {model_name}")
+    return SSH_REGISTRY[model_name](cfg_ssh=cfg_ssh)
+
+from src.nets.backbone import build_backbone
+from src.nets.fpn import build_fpn
 
 if __name__ == '__main__':
-    mn = MobileNetV2()
+    x = torch.randn(1, 3, 640, 640)
+
+    mn = build_backbone(model_name='mobilenetv2', cfg_backbone={'pretrained': True})
     mn.eval()
 
-    x = torch.randn(1, 3, 640, 640)
     with torch.no_grad():
         outputs = mn(x)
     print("mn模型配置:", mn.cfg)
@@ -78,9 +97,9 @@ if __name__ == '__main__':
     print("各输出特征图形状：")
     for i, name in enumerate(['high', 'mid', 'low']):
         feat = outputs[name]
-        print(f"{name}: {feat.shape} (stride={mn.out_steps[i]})")
+        print(f"{name}: {feat.shape} (stride={mn.cfg['out_steps'][i]})")
 
-    fpn = FPN()
+    fpn = build_fpn(model_name='fpn', cfg_fpn={'out_steps': [1, 1, 1]})
     fpn.eval()
 
     with torch.no_grad():
@@ -90,9 +109,9 @@ if __name__ == '__main__':
     print("各输出特征图形状：")
     for i, name in enumerate(['high', 'mid', 'low']):
         feat = outputs[name]
-        print(f"{name}: {feat.shape} (stride={fpn.out_steps[i]})")
+        print(f"{name}: {feat.shape} (stride={fpn.cfg['out_steps'][i]})")
 
-    ssh = SSH()
+    ssh = build_ssh(model_name='ssh')
     ssh.eval()
 
     with torch.no_grad():

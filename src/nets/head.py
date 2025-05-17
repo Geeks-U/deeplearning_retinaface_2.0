@@ -2,6 +2,16 @@ import torch
 import torch.nn as nn
 import copy
 
+# 注册表
+HEAD_REGISTRY = {}
+# 装饰器
+def register_head(name: str):
+    def decorator(cls):
+        HEAD_REGISTRY[name] = cls
+        return cls
+    return decorator
+
+
 class ConvHead(nn.Module):
     """Shared head for bbox, cls, or landmark"""
     def __init__(self, in_channels, out_channels, num_anchors=2, num_layers=4):
@@ -26,10 +36,12 @@ class ConvHead(nn.Module):
 # ldm: 5个关键点 * 2坐标 (x, y)
 cfg_default = {
     'in_channels': 256,
+    'out_names': ['bbox' , 'cls', 'ldm'],
     'out_channels': [4, 2, 10],
     'num_anchor': 2
 }
 
+@register_head('sharehead')
 class ShareHead(nn.Module):
     def __init__(self, cfg_head=None):
         super().__init__()
@@ -58,20 +70,26 @@ class ShareHead(nn.Module):
         ldm_outputs = torch.cat(ldm_outputs, dim=1)
 
         return {
-            'bbox': bbox_outputs,
-            'cls': cls_outputs,
-            'ldm': ldm_outputs
+            self.cfg['out_names'][0]: bbox_outputs,
+            self.cfg['out_names'][1]: cls_outputs,
+            self.cfg['out_names'][2]: ldm_outputs
             }
 
-from src.nets.backbone import MobileNetV2
-from src.nets.fpn import FPN
-from src.nets.ssh import SSH
+def build_head(model_name: str, cfg_head=None) -> nn.Module:
+    if model_name not in HEAD_REGISTRY:
+        raise ValueError(f"Unknown model name: {model_name}")
+    return HEAD_REGISTRY[model_name](cfg_head=cfg_head)
+
+from src.nets.backbone import build_backbone
+from src.nets.fpn import build_fpn
+from src.nets.ssh import build_ssh
 
 if __name__ == '__main__':
-    mn = MobileNetV2()
+    x = torch.randn(1, 3, 640, 640)
+
+    mn = build_backbone(model_name='mobilenetv2', cfg_backbone={'pretrained': True})
     mn.eval()
 
-    x = torch.randn(1, 3, 640, 640)
     with torch.no_grad():
         outputs = mn(x)
     print("mn模型配置:", mn.cfg)
@@ -79,9 +97,9 @@ if __name__ == '__main__':
     print("各输出特征图形状：")
     for i, name in enumerate(['high', 'mid', 'low']):
         feat = outputs[name]
-        print(f"{name}: {feat.shape} (stride={mn.out_steps[i]})")
+        print(f"{name}: {feat.shape} (stride={mn.cfg['out_steps'][i]})")
 
-    fpn = FPN()
+    fpn = build_fpn(model_name='fpn', cfg_fpn={'out_steps': [1, 1, 1]})
     fpn.eval()
 
     with torch.no_grad():
@@ -91,9 +109,9 @@ if __name__ == '__main__':
     print("各输出特征图形状：")
     for i, name in enumerate(['high', 'mid', 'low']):
         feat = outputs[name]
-        print(f"{name}: {feat.shape} (stride={fpn.out_steps[i]})")
+        print(f"{name}: {feat.shape} (stride={fpn.cfg['out_steps'][i]})")
 
-    ssh = SSH()
+    ssh = build_ssh(model_name='ssh')
     ssh.eval()
 
     with torch.no_grad():
@@ -105,7 +123,8 @@ if __name__ == '__main__':
         feat = outputs[name]
         print(f"{name}: {feat.shape}")
 
-    head = ShareHead()
+
+    head = build_head(model_name='sharehead')
     head.eval()
 
     with torch.no_grad():

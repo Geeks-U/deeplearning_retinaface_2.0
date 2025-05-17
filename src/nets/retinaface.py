@@ -1,11 +1,12 @@
-import torch
-import torch.nn as nn
 import copy
 
-from src.nets.backbone import MobileNetV2
-from src.nets.fpn import FPN
-from src.nets.ssh import SSH
-from src.nets.head import ShareHead
+import torch
+import torch.nn as nn
+
+from src.nets.backbone import build_backbone
+from src.nets.fpn import build_fpn
+from src.nets.ssh import build_ssh
+from src.nets.head import build_head
 
 cfg_default = {}
 
@@ -16,10 +17,10 @@ class Retinaface(nn.Module):
         if cfg_model is not None:
             self.cfg.update(cfg_model)
 
-        self.backbone = MobileNetV2()
-        self.fpn = FPN()
-        self.ssh = SSH()
-        self.head = ShareHead()
+        self.backbone = build_backbone(model_name='mobilenetv2')
+        self.fpn = build_fpn(model_name='fpn')
+        self.ssh = build_ssh(model_name='ssh')
+        self.head = build_head(model_name='sharehead')
 
     def forward(self, x):
         output_backbone = self.backbone(x)

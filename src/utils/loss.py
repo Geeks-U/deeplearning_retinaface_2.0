@@ -1,30 +1,35 @@
+import copy
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
 from src.utils.anchor import match_center_anchor_to_gt_box_percent
 
 def log_sum_exp(x):
     x_max = x.data.max()
     return torch.log(torch.sum(torch.exp(x-x_max), 1, keepdim=True)) + x_max
 
+cfg_loss_default = {
+    'num_classes': 2,
+    'overlap_thresh': 0.35,
+    'neg_pos': 7,
+    'variance': [0.1, 0.2],
+    'cuda': True
+}
+
 class CustomLoss(nn.Module):
-    def __init__(self, num_classes, overlap_thresh, neg_pos, variance, cuda=True):
-        super(CustomLoss, self).__init__()
-        #----------------------------------------------#
-        #   对于retinaface而言num_classes等于2
-        #----------------------------------------------#
-        self.num_classes    = num_classes
-        #----------------------------------------------#
-        #   重合程度在多少以上认为该先验框可以用来预测
-        #----------------------------------------------#
-        self.threshold      = overlap_thresh
-        #----------------------------------------------#
-        #   正负样本的比率
-        #----------------------------------------------#
-        self.negpos_ratio   = neg_pos
-        self.variance       = variance
-        self.cuda           = cuda
-        print('Loss Function initial successful.')
+    def __init__(self, cfg_loss=None):
+        super().__init__()
+        self.cfg = copy.deepcopy(cfg_loss_default)
+        if cfg_loss is not None:
+            self.cfg.update(cfg_loss)
+
+        self.num_classes    = self.cfg['num_classes']
+        self.threshold      = self.cfg['overlap_thresh']
+        self.negpos_ratio   = self.cfg['neg_pos']
+        self.variance       = self.cfg['variance']
+        self.cuda           = self.cfg['cuda']
 
     def forward(self, predictions, priors, targets):
         #--------------------------------------------------------------------#

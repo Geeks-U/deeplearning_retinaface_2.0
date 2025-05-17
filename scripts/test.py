@@ -40,7 +40,7 @@ cfg_test = {
 # self.input_image_size = [320, 320]
 # self.clip = False
     'cfg_anchor': {
-        'input_image_size': [1280, 1280],
+        'input_image_size': [320, 320],
         'num_fpn_feature_layers': 3,
         'backbone_fpn_strides': [8, 16, 32],
         'num_anchor_per_pixel': 2,
@@ -52,7 +52,7 @@ cfg_test = {
     'cfg_data': {
         'model_path': r'D:\Code\DL\Pytorch\retinaface\weights\model_last_20250516_165547.pth',
         'img_path': r'D:\Code\DL\Pytorch\retinaface\src\images\0_Parade_marchingband_1_122.jpg',
-        'image_size': [1280, 1280],
+        'image_size': [320, 320],
     },
     'cfg_hyperparameter': {
         'CUDA': True,

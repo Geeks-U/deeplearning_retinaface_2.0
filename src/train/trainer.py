@@ -16,8 +16,7 @@ cfg_anchor = {
     'backbone_fpn_strides': [8, 16, 32],
     'num_anchor_per_pixel': 2,
     'anchor_ratios_per_level': [[8, 16], [32, 64], [128, 256]],
-    'clip': False,
-    'variance': [0.1, 0.2]
+    'clip': True
 }
 
 def save_model(model, path: Path):
@@ -27,8 +26,8 @@ def save_model(model, path: Path):
 if __name__ == '__main__':
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-    num_epochs = 10
-    batch_size = 16
+    num_epochs = 5
+    batch_size = 32
     learning_rate = 1e-2
 
     # corner坐标，单位percent，范围0-1
@@ -44,10 +43,10 @@ if __name__ == '__main__':
     weights_save_dir.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
 
-    anchors = CustomAnchors(cfg_anchor=cfg_anchor).get_center_anchors().to(device)
+    anchors = CustomAnchors().get_center_anchors().to(device)
     print("锚框形状: ", anchors.size())
 
-    criterion = CustomLoss(num_classes=2, overlap_thresh=0.35, neg_pos=7, variance=[0.1, 0.2])
+    criterion = CustomLoss()
 
     optimizer = optim.SGD(
         model.parameters(),
@@ -74,6 +73,11 @@ if __name__ == '__main__':
 
             loss_l, loss_c, loss_landm = criterion([out['bbox'], out['cls'], out['ldm']], anchors, targets)
             loss = 2 * loss_l + loss_c + loss_landm
+
+            # 检查 loss 是否为 inf
+            if torch.isinf(loss):
+                print(f"[Warning] Loss is inf at Epoch {epoch + 1}, Step {i + 1}. Skipping backward and optimizer step.")
+                continue  # 跳过该 batch
 
             loss.backward()
             optimizer.step()
@@ -103,6 +107,7 @@ if __name__ == '__main__':
         save_model(model, last_path)
 
         if avg_loss < best_loss:
+            print('-----------------------------------------------------')
             best_loss = avg_loss
             best_path = weights_save_dir / f'model_best_{timestamp}.pth'
             save_model(model, best_path)

@@ -1,27 +1,31 @@
-import torch
+import copy
 from math import ceil               # 向上取整函数
 from itertools import product       # 用于生成笛卡尔积
-from typing import TypedDict, List  # 类型引入
 
-class AnchorConfigDict(TypedDict):
-    input_image_size: List[int]
-    num_fpn_feature_layers: int
-    backbone_fpn_strides: List[int]
-    num_anchor_per_pixel: int
-    anchor_ratios_per_level: List[List[int]]
-    clip: bool
+import torch
+
+cfg_anchor_default = {
+    'input_image_size': [320, 320],
+    'num_fpn_feature_layers': 3,
+    'backbone_fpn_strides': [8, 16, 32],
+    'num_anchor_per_pixel': 2,
+    'anchor_ratios_per_level': [[8, 16], [32, 64], [128, 256]],
+    'clip': True
+}
 
 class CustomAnchors(object):
-    def __init__(self, cfg_anchor: AnchorConfigDict):
-        super(CustomAnchors, self).__init__()
-        self.input_image_size = cfg_anchor['input_image_size']
-        self.num_fpn_feature_layers = cfg_anchor['num_fpn_feature_layers']
-        self.backbone_fpn_strides = cfg_anchor['backbone_fpn_strides']
-        self.num_anchor_per_pixel = cfg_anchor['num_anchor_per_pixel']
-        self.anchor_ratios_per_level = cfg_anchor['anchor_ratios_per_level']
-        self.clip = cfg_anchor['clip']
-        # 初始化时自动验证配置
-        self.validate_anchor_config()
+    def __init__(self, cfg_anchor=None):
+        super().__init__()
+        self.cfg = copy.deepcopy(cfg_anchor_default)
+        if cfg_anchor is not None:
+            self.cfg.update(cfg_anchor)
+
+        self.input_image_size = self.cfg['input_image_size']
+        self.num_fpn_feature_layers = self.cfg['num_fpn_feature_layers']
+        self.backbone_fpn_strides = self.cfg['backbone_fpn_strides']
+        self.num_anchor_per_pixel = self.cfg['num_anchor_per_pixel']
+        self.anchor_ratios_per_level = self.cfg['anchor_ratios_per_level']
+        self.clip = self.cfg['clip']
 
         # 计算每个特征图的尺寸
         self.fpn_feature_output_size = [
@@ -31,39 +35,6 @@ class CustomAnchors(object):
             ]
             for stride in self.backbone_fpn_strides
         ]
-    
-    # 参数合法性检验
-    def validate_anchor_config(self):
-        # 检查特征图层数是否和 strides 数量一致
-        assert self.num_fpn_feature_layers == len(self.backbone_fpn_strides), \
-            f"num_fpn_feature_layers ({self.num_fpn_feature_layers}) != len(backbone_fpn_strides) ({len(self.backbone_fpn_strides)})"
-        
-        # 检查特征图层数是否和每层 anchor 配置数量一致
-        assert self.num_fpn_feature_layers == len(self.anchor_ratios_per_level), \
-            f"num_fpn_feature_layers ({self.num_fpn_feature_layers}) != len(anchor_ratios_per_level) ({len(self.anchor_ratios_per_level)})"
-        
-        # 检查输入图像尺寸是否为二元整数列表
-        assert isinstance(self.input_image_size, list), f"input_image_size should be a list, got {type(self.input_image_size)}"
-        assert len(self.input_image_size) == 2, f"input_image_size should have two elements, got {len(self.input_image_size)}"
-        for dim in self.input_image_size:
-            assert isinstance(dim, int), f"input_image_size element {dim} should be an integer, got {type(dim)}"
-        
-        # 检查每个 stride 是否能整除输入图像的宽高
-        for i, stride in enumerate(self.backbone_fpn_strides):
-            for dim in self.input_image_size:
-                assert isinstance(stride, int), f"Stride at level {i} should be an integer, got {type(stride)}"
-                assert dim % stride == 0, \
-                    f"input_image_size dimension {dim} is not divisible by stride {stride} at level {i}"
-        
-        # 检查每层的 anchor 配置是否为 list 且长度是否匹配 num_anchor_per_pixel
-        for i, ratios in enumerate(self.anchor_ratios_per_level):
-            assert isinstance(ratios, list), f"anchor_ratios_per_level[{i}] should be a list"
-            assert len(ratios) == self.num_anchor_per_pixel, \
-                f"anchor_ratios_per_level[{i}] length ({len(ratios)}) != num_anchor_per_pixel ({self.num_anchor_per_pixel})"
-            for j, r in enumerate(ratios):
-                assert isinstance(r, int), \
-                    f"anchor_ratios_per_level[{i}][{j}] should be a float, got {type(r)}"
-        print("Anchor configuration is valid.")
 
     # 中心锚框生成 x, y, w, h = 锚框中心坐标(x, y); 锚框宽高(w, h). 单位均为百分比
     def get_center_anchors(self):
@@ -164,7 +135,7 @@ def match_center_anchor_to_gt_box_percent(center_anchors, corner_box_t, landm_t,
     for i in range(best_prior_iou.size(0)):
         best_prior_iou[i] = 2   # 未实际使用
         best_truth_index[best_prior_index[i]] = i
-    
+
     # 获取每个先验框对应的最好的真实框 [len(center_anchors),4]
     match_box_t = corner_box_t[best_truth_index]
     # 获取每个先验框对应的最好的真实框的标签 [len(center_anchors),1], 1表示有人脸并且有特征点，-1表示有人脸无特征点
@@ -184,10 +155,10 @@ def match_center_anchor_to_gt_box_percent(center_anchors, corner_box_t, landm_t,
     # match_landm_t = (prior_x, prior_y) + (Δw, Δh) * (prior_w, prior_h)
     # (Δw, Δh) = (match_landm_t - (prior_x, prior_y)) / (prior_w, prior_h)
     landm_target = calc_target_landm(match_landm_t, center_anchors, variances)
-    
+
     return box_target, landm_target, match_label_t
 
-# Δ = (match_box_t - prior_box) / prior_box
+# Δ = (match_box_t - prior_box) / prior_box[2:]
 # 参数为corner框, center框，构造bbox的target
 def calc_target_bbox(truth_corner_box, prior_center_box, variances):
     # 中心编码
