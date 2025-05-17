@@ -139,7 +139,7 @@ class CustomLoss(nn.Module):
         N = max(num_pos.data.sum().float(), 1)
         # box基于正样本(label!=0)
         loss_l /= N
-        # num_neg >> num_pos，如果使用和来归一化会使得cls_loss较小，正样本的cls学习困难
+        # num_neg >> num_pos，如果使用和(num_pos+num_neg)来归一化会使得cls_loss较小，正样本的cls学习困难
         loss_c /= N
 
         num_pos_landm = pos1.long().sum(1, keepdim=True)

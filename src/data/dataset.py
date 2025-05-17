@@ -77,9 +77,7 @@ class CustomDataset(Dataset):
         if len(label) == 0:
             return image, np.zeros((0, 15))
 
-        # image, label = self._sample_transform(image=image, label=label, input_shape=self.image_input_size)
-        image, label = self.get_random_data(image, label, self.image_input_size)
-        image = np.transpose(self.preprocess_input(np.array(image, np.float32)), (2, 0, 1))
+        image, label = self._sample_transform(image=image, label=label, input_shape=self.image_input_size)
 
         return image, label
 
@@ -89,112 +87,35 @@ class CustomDataset(Dataset):
         img_w, img_h = image.size
         input_h, input_w = input_shape
 
-        # 图像调整
-        new_image = image.resize((input_w, input_h), Image.BICUBIC)
-        new_image = np.array(new_image, dtype=np.uint8)
-        new_image = np.array(new_image, dtype=np.float32) - np.array((123, 117, 104), np.float32)
-        new_image = np.transpose(new_image, (2, 0, 1))
+        # 图像调整 + 转为float32 numpy数组（合并操作，减少转换次数）
+        new_image = np.array(image.resize((input_w, input_h), Image.BICUBIC), dtype=np.float32)
+        # 减均值（广播操作）
+        mean = np.array([123.0, 117.0, 104.0], dtype=np.float32)
+        new_image -= mean
+        # 转置维度 (H,W,C) -> (C,H,W)
+        new_image = new_image.transpose(2, 0, 1)
 
-        # 标签同步调整
-        label[:, 0:14:2] /= img_w
-        label[:, 1:15:2] /= img_h
-        # label坐标clip到0~1范围
-        label[:, 0:14] = np.clip(label[:, 0:14], 0, 1)
+        # 数据清洗：筛选有效框
+        np.random.shuffle(label)
+        # 筛除非法中心点
+        center = (label[:, 0:2] + label[:, 2:4]) * 0.5
+        # 筛除非法宽高
+        size = label[:, 2:4] - label[:, 0:2]
+
+        valid = (
+            (center[:, 0] > 0) & (center[:, 0] < img_w) &
+            (center[:, 1] > 0) & (center[:, 1] < img_h) &
+            (size[:, 0] > 1) & (size[:, 1] > 1)
+        )
+        label = label[valid]
+
+        # 归一化和裁剪坐标，合并切片，减少重复操作 坐标映射到coords(默认操作为映射，copy()则为拷贝)
+        coords = label[:, 0:14]
+        coords[:, 0:14:2] /= img_w
+        coords[:, 1:14:2] /= img_h
+        np.clip(coords, 0, 1, out=coords)
 
         return new_image, label
-
-    def get_random_data(self, image, targets, input_shape, jitter=.3, hue=.1, sat=0.7, val=0.4):
-        iw, ih  = image.size
-        h, w    = input_shape
-        box     = targets
-
-        #------------------------------------------#
-        #   对图像进行缩放并且进行长和宽的扭曲
-        #------------------------------------------#
-        new_ar = w/h * self.rand(1-jitter,1+jitter)/self.rand(1-jitter,1+jitter)
-        scale = self.rand(0.25, 3.25)
-        if new_ar < 1:
-            nh = int(scale*h)
-            nw = int(nh*new_ar)
-        else:
-            nw = int(scale*w)
-            nh = int(nw/new_ar)
-        image = image.resize((nw,nh), Image.BICUBIC)
-
-        #------------------------------------------#
-        #   将图像多余的部分加上灰条
-        #------------------------------------------#
-        dx = int(self.rand(0, w-nw))
-        dy = int(self.rand(0, h-nh))
-        new_image = Image.new('RGB', (w,h), (128,128,128))
-        new_image.paste(image, (dx, dy))
-        image = new_image
-
-        #------------------------------------------#
-        #   翻转图像
-        #------------------------------------------#
-        flip = self.rand()<.5
-        if flip: image = image.transpose(Image.FLIP_LEFT_RIGHT)
-
-        image_data      = np.array(image, np.uint8)
-        #---------------------------------#
-        #   对图像进行色域变换
-        #   计算色域变换的参数
-        #---------------------------------#
-        r               = np.random.uniform(-1, 1, 3) * [hue, sat, val] + 1
-        #---------------------------------#
-        #   将图像转到HSV上
-        #---------------------------------#
-        hue, sat, val   = cv2.split(cv2.cvtColor(image_data, cv2.COLOR_RGB2HSV))
-        dtype           = image_data.dtype
-        #---------------------------------#
-        #   应用变换
-        #---------------------------------#
-        x       = np.arange(0, 256, dtype=r.dtype)
-        lut_hue = ((x * r[0]) % 180).astype(dtype)
-        lut_sat = np.clip(x * r[1], 0, 255).astype(dtype)
-        lut_val = np.clip(x * r[2], 0, 255).astype(dtype)
-
-        image_data = cv2.merge((cv2.LUT(hue, lut_hue), cv2.LUT(sat, lut_sat), cv2.LUT(val, lut_val)))
-        image_data = cv2.cvtColor(image_data, cv2.COLOR_HSV2RGB)
-
-        #---------------------------------#
-        #   对真实框进行调整
-        #---------------------------------#
-        if len(box)>0:
-            np.random.shuffle(box)
-            box[:, [0,2,4,6,8,10,12]] = box[:, [0,2,4,6,8,10,12]]*nw/iw + dx
-            box[:, [1,3,5,7,9,11,13]] = box[:, [1,3,5,7,9,11,13]]*nh/ih + dy
-            if flip:
-                box[:, [0,2,4,6,8,10,12]] = w - box[:, [2,0,6,4,8,12,10]]
-                box[:, [5,7,9,11,13]]     = box[:, [7,5,9,13,11]]
-
-            center_x = (box[:, 0] + box[:, 2])/2
-            center_y = (box[:, 1] + box[:, 3])/2
-
-            box = box[np.logical_and(np.logical_and(center_x>0, center_y>0), np.logical_and(center_x<w, center_y<h))]
-
-            box[:, 0:14][box[:, 0:14]<0] = 0
-            box[:, [0,2,4,6,8,10,12]][box[:, [0,2,4,6,8,10,12]]>w] = w
-            box[:, [1,3,5,7,9,11,13]][box[:, [1,3,5,7,9,11,13]]>h] = h
-
-            box_w = box[:, 2] - box[:, 0]
-            box_h = box[:, 3] - box[:, 1]
-            box = box[np.logical_and(box_w>1, box_h>1)] # discard invalid box
-
-        # 将不含有人脸关键点的box的landm置为0
-        box[:,4:-1][box[:,-1]==-1]=0
-        # 归一化
-        box[:, [0,2,4,6,8,10,12]] /= w
-        box[:, [1,3,5,7,9,11,13]] /= h
-        box_data = box
-        return image_data, box_data
-
-    def preprocess_input(self, image):
-        image -= np.array((104, 117, 123),np.float32)
-        return image
-    def rand(self, a=0, b=1):
-        return np.random.rand()*(b-a) + a
 
 # 自定义批次处理函数
 def detection_collate(batch):

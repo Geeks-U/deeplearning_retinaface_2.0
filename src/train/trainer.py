@@ -7,17 +7,8 @@ from datetime import datetime
 from src.nets.retinaface import Retinaface
 from src.data.dataset import CustomDataset, detection_collate
 from src.utils.anchor import CustomAnchors  # 锚框生成器
-
 from src.utils.loss import CustomLoss
 
-cfg_anchor = {
-    'input_image_size': [320, 320],
-    'num_fpn_feature_layers': 3,
-    'backbone_fpn_strides': [8, 16, 32],
-    'num_anchor_per_pixel': 2,
-    'anchor_ratios_per_level': [[8, 16], [32, 64], [128, 256]],
-    'clip': True
-}
 
 def save_model(model, path: Path):
     torch.save(model.state_dict(), path)
@@ -26,7 +17,7 @@ def save_model(model, path: Path):
 if __name__ == '__main__':
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-    num_epochs = 5
+    num_epochs = 10
     batch_size = 32
     learning_rate = 1e-2
 
