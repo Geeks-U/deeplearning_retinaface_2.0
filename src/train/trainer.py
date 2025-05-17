@@ -6,9 +6,10 @@ from pathlib import Path
 from datetime import datetime
 
 from src.nets.retinaface import Retinaface
-from src.data.dataset import CustomDataset, detection_collate
 from src.utils.anchor import CustomAnchors
 from src.utils.loss import CustomLoss
+
+from src.data.datamodule import DataModule  # 请替换成你的实际文件名和路径
 
 # 默认配置
 cfg_trainer_default = {
@@ -27,7 +28,6 @@ class Trainer:
         if cfg_trainer is not None:
             self.cfg.update(cfg_trainer)
 
-        # 使用配置字典
         self.device = 'cuda' if self.cfg['cuda'] and torch.cuda.is_available() else 'cpu'
         self.num_epochs = self.cfg['num_epochs']
         self.batch_size = self.cfg['batch_size']
@@ -50,13 +50,11 @@ class Trainer:
         )
         self.scheduler = optim.lr_scheduler.StepLR(self.optimizer, step_size=10, gamma=0.1)
 
-        self.train_loader = DataLoader(
-            CustomDataset(),
-            batch_size=self.batch_size,
-            shuffle=True,
-            num_workers=4,
-            collate_fn=detection_collate
-        )
+        # 使用 Lightning DataModule 来加载数据
+        self.datamodule = DataModule()
+        self.datamodule.setup(stage='fit')  # 生成数据集和拆分
+        self.train_loader = self.datamodule.train_dataloader()
+        self.val_loader = self.datamodule.val_dataloader()
 
         self.best_loss = float('inf')
 
@@ -117,7 +115,6 @@ class Trainer:
                 self.save_model(best_path)
 
 
-# 用法
 if __name__ == '__main__':
     config = {
         'num_epochs': 10,
@@ -128,5 +125,12 @@ if __name__ == '__main__':
         'weights_save_filename_suffix': datetime.now().strftime('%Y%m%d_%H%M%S')
     }
 
-    trainer = Trainer(cfg_trainer=config)
+    datamodule_cfg = {
+        'batch_size': config['batch_size'],
+        'num_workers': 4,
+        'pin_memory': True,
+        'val_split': 0.1
+    }
+
+    trainer = Trainer(cfg_trainer=config, datamodule_cfg=datamodule_cfg)
     trainer.train()

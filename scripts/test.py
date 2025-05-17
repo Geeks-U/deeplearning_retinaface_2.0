@@ -2,7 +2,7 @@ from src.test.tester import Tester
 
 if __name__ == '__main__':
     cfg_tester = {
-        'model_path': r'D:\Code\DL\Pytorch\retinaface\weights\model_best_20250517_184350.pth',
+        'model_path': r'D:\Code\DL\Pytorch\retinaface\weights\model_best_20250517_235034.pth',
         'input_image_size': [960, 960]
     }
 

@@ -9,7 +9,8 @@ import cv2
 cfg_dataset_default = {
     'image_dir': r'D:\Data\deeplearning\datasets\widerface\train\images',
     'label_path': r'D:\Data\deeplearning\datasets\widerface\train\label.txt',
-    'image_input_size': [320, 320]
+    'image_input_size': [320, 320],
+    'augment': False
 }
 
 class CustomDataset(Dataset):
@@ -86,6 +87,10 @@ class CustomDataset(Dataset):
     def _sample_transform(self, image, label, input_shape):
         img_w, img_h = image.size
         input_h, input_w = input_shape
+
+        # 是否进行数据增强
+        if self.cfg['augment']:
+            pass
 
         # 图像缩放 + 减去均值 + 转置维度
         new_image = np.array(image.resize((input_w, input_h), Image.BICUBIC), dtype=np.float32)
