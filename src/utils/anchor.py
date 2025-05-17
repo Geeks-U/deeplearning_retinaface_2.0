@@ -158,7 +158,7 @@ def match_center_anchor_to_gt_box_percent(center_anchors, corner_box_t, landm_t,
 
     return box_target, landm_target, match_label_t
 
-# Δ = (match_box_t - prior_box) / prior_box[2:]
+# Δ = (match_box_t - prior_box) / (prior_w, prior_h)
 # 参数为corner框, center框，构造bbox的target
 def calc_target_bbox(truth_corner_box, prior_center_box, variances):
     # 中心编码
@@ -167,6 +167,13 @@ def calc_target_bbox(truth_corner_box, prior_center_box, variances):
     delta_wh = (truth_corner_box[:, 2:] - truth_corner_box[:, :2]) / prior_center_box[:, 2:]
     delta_wh = torch.log(delta_wh) / variances[1]
     return torch.cat([delta_xy, delta_wh], 1)
+
+def calc_raw_bbox(loc, priors, variances):
+    boxes = torch.cat((priors[:, :2] + loc[:, :2] * variances[0] * priors[:, 2:],
+                    priors[:, 2:] * torch.exp(loc[:, 2:] * variances[1])), 1)
+    boxes[:, :2] -= boxes[:, 2:] / 2
+    boxes[:, 2:] += boxes[:, :2]
+    return boxes
 
 # (Δw, Δh) = (match_landm_t - (prior_x, prior_y)) / (prior_w, prior_h)
 # 参数为center框，构造landm的target
@@ -183,6 +190,41 @@ def calc_target_landm(truth_landm, prior_center_box, variances):
     g_cxcy /= (variances[0] * prior_center_box[:, :, 2:])
     g_cxcy = g_cxcy.reshape(g_cxcy.size(0), -1)
     return g_cxcy
+
+def calc_raw_landm(pre, priors, variances):
+    landms = torch.cat((priors[:, :2] + pre[:, :2] * variances[0] * priors[:, 2:],
+                        priors[:, :2] + pre[:, 2:4] * variances[0] * priors[:, 2:],
+                        priors[:, :2] + pre[:, 4:6] * variances[0] * priors[:, 2:],
+                        priors[:, :2] + pre[:, 6:8] * variances[0] * priors[:, 2:],
+                        priors[:, :2] + pre[:, 8:10] * variances[0] * priors[:, 2:],
+                        ), dim=1)
+    return landms
+
+from torchvision.ops import nms
+
+def non_max_suppression(detection, conf_thres=0.5, nms_thres=0.3):
+    #------------------------------------------#
+    #   找出该图片中得分大于门限函数的框。
+    #   在进行重合框筛选前就
+    #   进行得分的筛选可以大幅度减少框的数量。
+    #------------------------------------------#
+    mask        = detection[:, 4] >= conf_thres
+    detection   = detection[mask]
+
+    if len(detection) <= 0:
+        return []
+
+    #------------------------------------------#
+    #   使用官方自带的非极大抑制会速度更快一些！
+    #------------------------------------------#
+    keep = nms(
+        detection[:, :4],
+        detection[:, 4],
+        nms_thres
+    )
+    best_box = detection[keep]
+
+    return best_box.cpu().numpy()
 
 # 测试代码 --------------------------------------------------
 if __name__ == "__main__":

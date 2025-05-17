@@ -87,37 +87,38 @@ class CustomDataset(Dataset):
         img_w, img_h = image.size
         input_h, input_w = input_shape
 
-        # 图像调整 + 转为float32 numpy数组（合并操作，减少转换次数）
+        # 图像缩放 + 减去均值 + 转置维度
         new_image = np.array(image.resize((input_w, input_h), Image.BICUBIC), dtype=np.float32)
-        # 减均值（广播操作）
         mean = np.array([123.0, 117.0, 104.0], dtype=np.float32)
         new_image -= mean
-        # 转置维度 (H,W,C) -> (C,H,W)
-        new_image = new_image.transpose(2, 0, 1)
+        new_image = new_image.transpose(2, 0, 1)  # (H, W, C) -> (C, H, W)
 
-        # 数据清洗：筛选有效框
+        # 数据清洗
         np.random.shuffle(label)
-        # 筛除非法中心点
+
+        # 步骤1：筛除非法中心点
         center = (label[:, 0:2] + label[:, 2:4]) * 0.5
-        # 筛除非法宽高
-        size = label[:, 2:4] - label[:, 0:2]
-
-        valid = (
+        inside_mask = (
             (center[:, 0] > 0) & (center[:, 0] < img_w) &
-            (center[:, 1] > 0) & (center[:, 1] < img_h) &
-            (size[:, 0] > 1) & (size[:, 1] > 1)
+            (center[:, 1] > 0) & (center[:, 1] < img_h)
         )
-        label = label[valid]
+        label = label[inside_mask]
 
-        # 归一化和裁剪坐标，合并切片，减少重复操作 坐标映射到coords(默认操作为映射，copy()则为拷贝)
+        # 步骤2：筛除非法宽高（在中心合法的前提下）
+        size = label[:, 2:4] - label[:, 0:2]
+        valid_size_mask = (size[:, 0] > 1) & (size[:, 1] > 1)
+        label = label[valid_size_mask]
+
+        # 坐标归一化并裁剪
         coords = label[:, 0:14]
         coords[:, 0:14:2] /= img_w
         coords[:, 1:14:2] /= img_h
+        # 原地操作
         np.clip(coords, 0, 1, out=coords)
 
         return new_image, label
 
-# 自定义批次处理函数
+# 自定义批次处理函数(默认会将批次label对齐, 该项目每个图象label数量可能不同导致对不齐)
 def detection_collate(batch):
     images  = []
     targets = []
