@@ -1,36 +1,27 @@
 from fastapi import FastAPI, File, UploadFile
-from fastapi.responses import StreamingResponse
-from fastapi.middleware.cors import CORSMiddleware  # 导入中间件
+from fastapi.responses import StreamingResponse, FileResponse
 from io import BytesIO
 from PIL import Image
 import torch
 import uvicorn
-import numpy as np
 import cv2
+import os
 
 from src.test.tester import Tester
 
 app = FastAPI()
-
-# 允许跨域的域名列表，这里先开放所有，部署时可指定具体域名
-origins = [
-    "*"
-]
-
-# 添加中间件
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,       # 允许所有来源跨域
-    allow_credentials=True,
-    allow_methods=["*"],         # 允许所有方法
-    allow_headers=["*"],         # 允许所有请求头
-)
 
 cfg_tester = {
     'model_path': r'D:\Code\DL\Pytorch\retinaface\weights\model_best_20250518_021914.pth',
     'input_image_size': [320, 320]
 }
 test = Tester(cfg_tester=cfg_tester)
+
+@app.get("/")
+async def get_html():
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    html_path = os.path.join(current_dir, "fastapi.html")
+    return FileResponse(html_path)
 
 @app.post("/detect")
 async def detect(frame: UploadFile = File(...)):
@@ -47,6 +38,8 @@ async def detect(frame: UploadFile = File(...)):
     return StreamingResponse(BytesIO(buffer.tobytes()), media_type="image/jpeg")
 
 if __name__ == "__main__":
+    print("模型路径：", cfg_tester['model_path'])
+    print("点击打开视频检测demo http://localhost:8000")
     uvicorn.run(
         "src.utils.fastapi:app",
         host="0.0.0.0",

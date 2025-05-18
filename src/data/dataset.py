@@ -9,7 +9,7 @@ import cv2
 cfg_dataset_default = {
     'image_dir': r'D:\Data\deeplearning\datasets\widerface\train\images',
     'label_path': r'D:\Data\deeplearning\datasets\widerface\train\label.txt',
-    'image_input_size': [320, 320],
+    'input_image_size': [320, 320],
     'augment': False
 }
 
@@ -20,7 +20,7 @@ class CustomDataset(Dataset):
             self.cfg.update(cfg_dataset)
         self.image_dir = Path(self.cfg['image_dir'])
         self.label_path = Path(self.cfg['label_path'])
-        self.image_input_size = self.cfg['image_input_size']
+        self.input_image_size = self.cfg['input_image_size']
 
         self.samples = self._load_annotations()
 
@@ -78,7 +78,7 @@ class CustomDataset(Dataset):
         if len(label) == 0:
             return image, np.zeros((0, 15))
 
-        image, label = self._sample_transform(image=image, label=label, input_shape=self.image_input_size)
+        image, label = self._sample_transform(image=image, label=label, input_shape=self.input_image_size)
 
         return image, label
 

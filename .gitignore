@@ -3,8 +3,9 @@ __pycache__/
 **/__pycache__/
 *.py[cod]
 
-# 权重文件夹（可能很大，不上传）
-weights/
+# 权重文件夹（忽略所有，但保留示例）
+weights/*
+!weights/model_best_20250518_021914.pth  # 保留示例权重
 
 # 临时文件
 *.log

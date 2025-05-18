@@ -34,11 +34,12 @@ class Trainer:
         self.learning_rate = self.cfg['learning_rate']
         self.weights_save_dir = Path(self.cfg['weights_save_dir'])
         self.timestamp = self.cfg['weights_save_filename_suffix']
+        self.input_image_size = self.cfg['input_image_size']
 
         self.weights_save_dir.mkdir(parents=True, exist_ok=True)
 
         self.model = Retinaface().to(self.device)
-        self.anchors = CustomAnchors().get_center_anchors().to(self.device)
+        self.anchors = CustomAnchors(cfg_anchor={'input_image_size': self.input_image_size}).get_center_anchors().to(self.device)
         print("锚框形状: ", self.anchors.size())
 
         self.criterion = CustomLoss()
@@ -52,7 +53,7 @@ class Trainer:
 
         # 使用 Lightning DataModule 来加载数据
         self.datamodule = DataModule()
-        self.datamodule.setup(stage='fit')  # 生成数据集和拆分
+        self.datamodule.setup(stage='fit', cfg_fit={'input_image_size': self.input_image_size})  # 生成数据集和拆分
         self.train_loader = self.datamodule.train_dataloader()
         self.val_loader = self.datamodule.val_dataloader()
 
