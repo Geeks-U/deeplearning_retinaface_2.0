@@ -22,7 +22,7 @@
 
 1. 克隆仓库：
 ```bash
-git clone https://github.com/yourusername/retinaface.git
+git clone https://github.com/Geeks-U/deeplearning_retinaface_2.0.git
 cd retinaface
 ```
 

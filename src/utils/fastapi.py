@@ -11,8 +11,12 @@ from src.test.tester import Tester
 
 app = FastAPI()
 
+# Get the project root directory (2 levels up from this file)
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+model_path = os.path.join(project_root, "weights", "model_best_20250518_021914.pth")
+
 cfg_tester = {
-    'model_path': r'D:\Code\DL\Pytorch\retinaface\weights\model_best_20250518_021914.pth',
+    'model_path': model_path,
     'input_image_size': [320, 320]
 }
 test = Tester(cfg_tester=cfg_tester)
