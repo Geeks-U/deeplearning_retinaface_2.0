@@ -80,12 +80,12 @@ class Tester:
             for i, color in enumerate(colors):
                 cv2.circle(old_image, (b[5 + i * 2], b[5 + i * 2 + 1]), 1, color, 4)
 
-        image_bgr = cv2.cvtColor(old_image, cv2.COLOR_RGB2BGR)
 
+        # return RGB
         if return_image:
-            return image_bgr
+            return old_image
         else:
-            cv2.imshow("Detection Result", image_bgr)
+            cv2.imshow("Detection Result", cv2.cvtColor(old_image, cv2.COLOR_RGB2BGR))
             cv2.waitKey(0)
             cv2.destroyAllWindows()
             return None

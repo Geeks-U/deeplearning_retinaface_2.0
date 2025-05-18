@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>摄像头实时检测展示</title>
+  <style>
+    body {
+      margin: 0; padding: 0;
+      display: flex;
+      height: 100vh;
+      background: #222;
+      color: white;
+      font-family: Arial, sans-serif;
+      overflow: hidden;
+    }
+    #left, #right {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: #000;
+      position: relative;
+    }
+    video, img {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+      border: 1px solid #555;
+      background: black;
+    }
+    #status, #samplingFreq, #fpsDisplay {
+      position: absolute;
+      background: rgba(0,0,0,0.5);
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 14px;
+      color: #0f0;
+      z-index: 10;
+      user-select: none;
+      pointer-events: none;
+    }
+    #status {
+      top: 10px;
+      left: 10px;
+    }
+    #samplingFreq {
+      top: 40px;
+      left: 10px;
+    }
+    #fpsDisplay {
+      top: 10px;
+      right: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div id="left">
+    <div id="status">初始化摄像头...</div>
+    <div id="samplingFreq">采样频率: -- FPS</div>
+    <video id="video" autoplay muted playsinline></video>
+  </div>
+  <div id="right">
+    <img id="output" alt="处理后图像" />
+    <div id="fpsDisplay">右侧实时帧率: -- FPS</div>
+  </div>
+
+  <script>
+    const video = document.getElementById('video')
+    const output = document.getElementById('output')
+    const status = document.getElementById('status')
+    const samplingFreq = document.getElementById('samplingFreq')
+    const fpsDisplay = document.getElementById('fpsDisplay')
+
+    // 创建隐藏canvas用于抓帧
+    const canvas = document.createElement('canvas')
+    const ctx = canvas.getContext('2d')
+
+    async function startCamera() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+        video.srcObject = stream
+
+        video.onloadedmetadata = () => {
+          canvas.width = video.videoWidth
+          canvas.height = video.videoHeight
+          status.textContent = '摄像头已启动，开始检测...'
+          startSendingFrames()
+        }
+      } catch (e) {
+        status.textContent = '无法打开摄像头: ' + e.message
+      }
+    }
+
+    async function startSendingFrames() {
+      const samplingFPS = 60  // 采样频率（发送帧率）
+      const interval = 1000 / samplingFPS
+      samplingFreq.textContent = `采样频率: ${samplingFPS} FPS`
+
+      // 用于计算右侧实时帧率（接收处理后图像的FPS）
+      let frameCount = 0
+      let lastTime = performance.now()
+
+      async function sendFrame() {
+        if (video.readyState < 2) {
+          setTimeout(sendFrame, interval)
+          return
+        }
+
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+
+        const blob = await new Promise(resolve =>
+          canvas.toBlob(resolve, 'image/jpeg', 0.8)
+        )
+        if (!blob) {
+          setTimeout(sendFrame, interval)
+          return
+        }
+
+        const formData = new FormData()
+        formData.append('frame', blob, 'frame.jpg')
+
+        try {
+          const resp = await fetch('http://localhost:8000/detect', {
+            method: 'POST',
+            body: formData
+          })
+          if (resp.ok) {
+            const imgBlob = await resp.blob()
+            const imgUrl = URL.createObjectURL(imgBlob)
+            output.src = imgUrl
+            if (output._lastUrl) {
+              URL.revokeObjectURL(output._lastUrl)
+            }
+            output._lastUrl = imgUrl
+            status.textContent = '检测成功'
+
+            // 计算右侧实时帧率
+            frameCount++
+            const now = performance.now()
+            if (now - lastTime >= 1000) {
+              const fps = frameCount / ((now - lastTime) / 1000)
+              fpsDisplay.textContent = `右侧实时帧率: ${fps.toFixed(1)} FPS`
+              frameCount = 0
+              lastTime = now
+            }
+          } else {
+            status.textContent = '检测接口错误: ' + resp.status
+            setTimeout(sendFrame, interval)
+            return
+          }
+        } catch (e) {
+          status.textContent = '请求失败: ' + e.message
+          setTimeout(sendFrame, interval)
+          return
+        }
+
+        setTimeout(sendFrame, interval)
+      }
+
+      sendFrame()
+    }
+
+    startCamera()
+  </script>
+</body>
+</html>
