@@ -44,6 +44,12 @@ python -m scripts.train
 - batch_size: 批次大小
 - input_image_size: 输入图像尺寸
 
+训练数据集配置可在 `src/data/dataset.py` 中修改：
+- image_dir: 图片目录,
+- label_path: 标签文件路径,
+
+数据集下载链接: https://pan.baidu.com/s/1uwztX937jhSUlOsG3QHRqA?pwd=s1sh 提取码: s1sh
+
 ### 2. 测试模型
 
 ```bash
@@ -94,10 +100,9 @@ retinaface/
 
 ## 注意事项
 
-1. 首次运行需要下载预训练模型权重
+1. 首次训练需要下载训练数据集
 2. GPU加速需要安装对应版本的CUDA和cuDNN
 3. FastAPI服务默认监听所有网络接口，生产环境部署时请注意安全配置
 
-## 许可证
-
-MIT License
+## Reference
+https://github.com/bubbliiiing/retinaface-pytorch.git
