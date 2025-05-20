@@ -136,13 +136,13 @@ class Trainer:
 
             avg_val_loss = self.validate()
 
-            last_path = self.weights_save_dir / f'model_last_{self.timestamp}.pth'
+            last_path = self.weights_save_dir / f'model_{self.timestamp}_last.pth'
             self.save_model(last_path)
 
             if avg_val_loss < self.best_loss:
                 print('-----------------------------------------------------')
                 self.best_loss = avg_val_loss
-                best_path = self.weights_save_dir / f'model_best_{self.timestamp}.pth'
+                best_path = self.weights_save_dir / f'model_{self.timestamp}_best.pth'
                 self.save_model(best_path)
 
 
